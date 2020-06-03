@@ -147,7 +147,7 @@ if __name__ == '__main__':
     # =========================
     
     train_vae(vae, x_train, x_test, epochs, batch_size, experiment_number)
-    #decoder.save_weights( weights_file )
+    decoder.save_weights( weights_file )
 
     # TODO: callback with checkpoint to stop any time!!
 
