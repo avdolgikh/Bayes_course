@@ -4,10 +4,10 @@ from keras import backend as K
 
 
 
-def build_vae_model(input_shape, latent_dim, conv_filters, conv_kernel, dropout):
+def build_vae_model(input_shape, latent_dim, conv_filters, conv_kernel, dropout, vae_kl_coef, BN, additional_dense_sf):
     x = keras.layers.Input( batch_shape=input_shape )
     
-    encoder_output, last_conv_size = create_encoder(x, latent_dim, conv_filters, conv_kernel, dropout)
+    encoder_output, last_conv_size = create_encoder(x, latent_dim, conv_filters, conv_kernel, dropout, BN, additional_dense_sf)
 
     get_t_mean = keras.layers.Lambda(lambda h: h[:, :latent_dim], name="t_mean")
     get_t_log_var = keras.layers.Lambda(lambda h: h[:, latent_dim:], name="t_log_var")
@@ -15,12 +15,12 @@ def build_vae_model(input_shape, latent_dim, conv_filters, conv_kernel, dropout)
     t_log_var = get_t_log_var(encoder_output)
 
     t = keras.layers.Lambda(sampling, name="t")([t_mean, t_log_var])
-    decoder = create_decoder(latent_dim, conv_filters, last_conv_size, conv_kernel, dropout)
+    decoder = create_decoder(latent_dim, conv_filters, last_conv_size, conv_kernel, dropout, BN, additional_dense_sf)
     x_decoded_mean = decoder(t)
     
     #print(x, x_decoded_mean)
 
-    loss = vae_loss(x, x_decoded_mean, t_mean, t_log_var)
+    loss = vae_loss(x, x_decoded_mean, t_mean, t_log_var, lmbd = vae_kl_coef)
     vae = keras.models.Model(inputs=x, outputs=x_decoded_mean, name="VAE")
 
     learning_rate = 1e-5
@@ -87,7 +87,7 @@ def sampling(args):
     
     return t_mean + eps * tf.sqrt( tf.exp(t_log_var) )
 
-def conv_layer(layer, filters, kernel, activation, stride, dropout):
+def conv_layer(layer, filters, kernel, activation, stride, dropout, BN):
     layer = keras.layers.Conv2D(filters=filters,
                                 kernel_size=(kernel, kernel),
                                 strides=(stride,stride),
@@ -96,41 +96,52 @@ def conv_layer(layer, filters, kernel, activation, stride, dropout):
                                 kernel_initializer='he_normal' #'TruncatedNormal' #'he_normal' # 'he_uniform'
                                 ,use_bias=False
                                )(layer)
-    layer = keras.layers.BatchNormalization(axis=-1)(layer)
+    if BN:
+        layer = keras.layers.BatchNormalization(axis=-1)(layer)
     layer = keras.layers.Activation(activation)(layer)
     if dropout is not None:
         layer = keras.layers.Dropout(dropout)(layer)
     return layer
 
-def dense_layer(layer, n_units, activation, dropout):
+def dense_layer(layer, n_units, activation, dropout, BN):
     layer = keras.layers.Dense(n_units, activation=None, use_bias=True
                                ,kernel_initializer='he_uniform' #'TruncatedNormal' #'he_normal' # 'he_uniform'
                               )(layer)
-    layer = keras.layers.BatchNormalization(axis=-1)(layer)
+    if BN:
+        layer = keras.layers.BatchNormalization(axis=-1)(layer)
     layer = keras.layers.Activation(activation)(layer)
     if dropout is not None:
         layer = keras.layers.Dropout(dropout)(layer)
     return layer
 
-def create_encoder(input, latent_dim, filters, kernel, dropout):
+def create_encoder(input, latent_dim, filters, kernel, dropout, BN, additional_dense_sf):
     layer = input
     for filter in filters:        
-        layer = conv_layer(layer, filters=filter, kernel=kernel, activation="selu", stride=1, dropout=dropout)
-        layer = conv_layer(layer, filters=filter, kernel=kernel, activation="selu", stride=2, dropout=dropout)
+        layer = conv_layer(layer, filters=filter, kernel=kernel, activation="selu", stride=1, dropout=dropout, BN=BN)
+        layer = conv_layer(layer, filters=filter, kernel=kernel, activation="selu", stride=2, dropout=dropout, BN=BN)
 
     last_conv_size = int(str( layer.shape[1] ))
 
     layer = keras.layers.Flatten()(layer)
-    layer = dense_layer(layer, 2 * latent_dim, "linear", dropout)
+    layer = dense_layer(layer, additional_dense_sf * latent_dim, "selu", dropout, BN)
+    layer = dense_layer(layer, 2 * latent_dim, "linear", dropout, BN)
     return layer, last_conv_size
 
-def create_decoder(input_dim, filters, first_conv_size, kernel, dropout):
+def create_decoder(input_dim, filters, first_conv_size, kernel, dropout, BN, additional_dense_sf):
     decoder = keras.models.Sequential(name='Decoder')
     decoder.add( keras.layers.InputLayer([input_dim]) )
     
+    decoder.add( keras.layers.Dense( int( 2./additional_dense_sf * first_conv_size * first_conv_size * filters[-1]) ) )
+    if BN:
+        decoder.add( keras.layers.BatchNormalization(axis=-1) )
+    decoder.add( keras.layers.Activation("selu") )
+    if dropout is not None:        
+        decoder.add( keras.layers.Dropout(dropout) )
+
     decoder.add( keras.layers.Dense(first_conv_size * first_conv_size * filters[-1] ) )
-    decoder.add( keras.layers.BatchNormalization(axis=-1) )
-    #decoder.add( keras.layers.Activation("selu") )
+    if BN:
+        decoder.add( keras.layers.BatchNormalization(axis=-1) )
+    decoder.add( keras.layers.Activation("selu") )
     if dropout is not None:        
         decoder.add( keras.layers.Dropout(dropout) )    
 
@@ -138,7 +149,8 @@ def create_decoder(input_dim, filters, first_conv_size, kernel, dropout):
 
     def add_deconv_block(filter, stride):
         decoder.add( keras.layers.Conv2DTranspose(filters=filter, kernel_size=kernel, strides=stride, padding='same', use_bias=False) )
-        decoder.add( keras.layers.BatchNormalization(axis=-1) )
+        if BN:
+            decoder.add( keras.layers.BatchNormalization(axis=-1) )
         decoder.add( layer = keras.layers.Activation("selu") )
         if dropout is not None:
             decoder.add( keras.layers.Dropout(dropout) )

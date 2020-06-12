@@ -10,8 +10,8 @@ def show(img):
 def imread(path):
     return cv2.imread( path ).astype(np.float32)  / 255.
 
-def resize(img):
-    return cv2.resize(img, (64, 64))
+def resize(img, size):
+    return cv2.resize(img, size)
 
 def read_paths(folder):
     paths = []
@@ -25,22 +25,30 @@ def read_paths(folder):
                 paths.append( file_path )
     return paths
 
-def read_images(folder):
+def read_images(folder, flat_structure, size=None):
     images = []
-    for subfolder in os.listdir(folder):
-        subfolder_path = folder + "/" + subfolder
-        if os.path.isfile(subfolder_path):
-            continue
-        for filename in os.listdir(subfolder_path):
-            file_path = subfolder_path + "/" + filename
-            if os.path.isfile(file_path):                
-                img = imread( file_path )
-                images.append( resize(img) )
+    for subitem in os.listdir(folder):
+        subitem_path = folder + "/" + subitem
+        if flat_structure:
+            if os.path.isfile(subitem_path):                                
+                img = imread( subitem_path )
+                if size is not None:
+                    img = resize( img, size )
+                images.append( img )
+        else:
+            if os.path.isfile(subitem_path):
+                continue
+            for filename in os.listdir(subitem_path):
+                file_path = subitem_path + "/" + filename
+                if os.path.isfile(file_path):                
+                    img = imread( file_path )
+                    if size is not None:
+                        img = resize( img, size )
+                    images.append( img )
     return np.array(images)
 
-def preprocess():
-    folder = '../../lfw'
-    images = read_images(folder)
+def preprocess(folder_with_originals, set_name, flat_structure, size):    
+    images = read_images(folder_with_originals, flat_structure, size)
     # TODO: or take only a single image from a folder?
 
     print(images.shape)
@@ -54,17 +62,19 @@ def preprocess():
     print(test.shape)
 
     # save as np-files
-    with open('../../lfw/train_lfw.npy', 'wb') as file:
+    with open('../../experiments/train_{}.npy'.format(set_name), 'wb') as file:
         np.save(file, train)
 
-    with open('../../lfw/test_lfw.npy', 'wb') as file:
+    with open('../../experiments/test_{}.npy'.format(set_name), 'wb') as file:
         np.save(file, test)
 
 
 
 if __name__ == '__main__':
 
-    with open('../../lfw/test_lfw.npy', 'rb') as file:
+    preprocess('../../img_align_celeba', "celeba", flat_structure=True, size=(64,78))
+
+    with open('../../experiments/test_celeba.npy', 'rb') as file:
         test = np.load(file)
 
     for _ in range(10):

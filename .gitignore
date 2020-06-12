@@ -128,3 +128,4 @@ dmypy.json
 /lfw
 */.vs/*
 *.zip
+/img_align_celeba
