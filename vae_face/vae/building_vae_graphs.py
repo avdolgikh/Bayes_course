@@ -120,7 +120,8 @@ def create_encoder(input, latent_dim, filters, kernel, dropout, BN, additional_d
         layer = conv_layer(layer, filters=filter, kernel=kernel, activation="selu", stride=1, dropout=dropout, BN=BN)
         layer = conv_layer(layer, filters=filter, kernel=kernel, activation="selu", stride=2, dropout=dropout, BN=BN)
 
-    last_conv_size = int(str( layer.shape[1] ))
+    last_conv_size = (int(str( layer.shape[1] )), int(str( layer.shape[2] )))
+    print(last_conv_size)
 
     layer = keras.layers.Flatten()(layer)
     layer = dense_layer(layer, additional_dense_sf * latent_dim, "selu", dropout, BN)
@@ -130,22 +131,24 @@ def create_encoder(input, latent_dim, filters, kernel, dropout, BN, additional_d
 def create_decoder(input_dim, filters, first_conv_size, kernel, dropout, BN, additional_dense_sf):
     decoder = keras.models.Sequential(name='Decoder')
     decoder.add( keras.layers.InputLayer([input_dim]) )
+
+    first_conv_size_1, first_conv_size_2 = first_conv_size
     
-    decoder.add( keras.layers.Dense( int( 2./additional_dense_sf * first_conv_size * first_conv_size * filters[-1]) ) )
+    decoder.add( keras.layers.Dense( int( 2./additional_dense_sf * first_conv_size_1 * first_conv_size_2 * filters[-1]) ) )
     if BN:
         decoder.add( keras.layers.BatchNormalization(axis=-1) )
     decoder.add( keras.layers.Activation("selu") )
     if dropout is not None:        
         decoder.add( keras.layers.Dropout(dropout) )
 
-    decoder.add( keras.layers.Dense(first_conv_size * first_conv_size * filters[-1] ) )
+    decoder.add( keras.layers.Dense(first_conv_size_1 * first_conv_size_2 * filters[-1] ) )
     if BN:
         decoder.add( keras.layers.BatchNormalization(axis=-1) )
     decoder.add( keras.layers.Activation("selu") )
     if dropout is not None:        
         decoder.add( keras.layers.Dropout(dropout) )    
 
-    decoder.add( keras.layers.Reshape((first_conv_size, first_conv_size, filters[-1])) )
+    decoder.add( keras.layers.Reshape((first_conv_size_1, first_conv_size_2, filters[-1])) )
 
     def add_deconv_block(filter, stride):
         decoder.add( keras.layers.Conv2DTranspose(filters=filter, kernel_size=kernel, strides=stride, padding='same', use_bias=False) )

@@ -5,7 +5,8 @@ import matplotlib.pyplot as plt
 
 
 def show(img):
-    plt.imshow( cv2.cvtColor( img, cv2.COLOR_BGR2RGB) ) # , cmap='gray'    plt.show()
+    plt.imshow( cv2.cvtColor( img, cv2.COLOR_BGR2RGB) ) # , cmap='gray'
+    plt.show()
 
 def imread(path):
     return cv2.imread( path ).astype(np.float32)  / 255.
@@ -68,18 +69,33 @@ def preprocess(folder_with_originals, set_name, flat_structure, size):
     with open('../../experiments/test_{}.npy'.format(set_name), 'wb') as file:
         np.save(file, test)
 
+def resize_batch(file_path, size):
+    with open(file_path, 'rb') as file:
+        data = np.load(file)
+        images = []
+        for img in data:
+            images.append( resize(img, size) )
+        images = np.array(images)
+        print(images.shape)
+        with open(file_path, 'wb') as file:
+            np.save(file, images)
+
+
 
 
 if __name__ == '__main__':
 
-    preprocess('../../img_align_celeba', "celeba", flat_structure=True, size=(64,78))
+    #preprocess('../../img_align_celeba', "celeba", flat_structure=True, size=(64,78))
 
-    with open('../../experiments/test_celeba.npy', 'rb') as file:
-        test = np.load(file)
+    resize_batch('../../experiments/train_celeba.npy', (64, 80))
 
-    for _ in range(10):
-        index = np.random.choice(len(test))        
-        show(test[index])
+    #with open('../../experiments/test_celeba.npy', 'rb') as file:
+    #    test = np.load(file)
+
+    # for _ in range(10):
+    #     index = np.random.choice(len(test))
+    #     img = test[index]
+    #     show(test[index])
 
     # build VAE
 

@@ -12,8 +12,8 @@ from stlr_callback import KerasSlantedTriangularLearningRateCallback
 
 
 FOLDER = '../../experiments/'
-TRAIN_SET = '../../experiments/train_lfw.npy'
-TEST_SET = '../../experiments/test_lfw.npy'
+TRAIN_SET = '../../experiments/train_celeba.npy'
+TEST_SET = '../../experiments/test_celeba.npy'
 
 
 def load_data(batch_size):
@@ -52,7 +52,7 @@ def train_vae(vae, x_train, x_test, epochs, batch_size, experiment_number, lr_ma
                    epochs=epochs,
                    batch_size=batch_size,
                    validation_data=(x_test, x_test),
-                   verbose=2,
+                   verbose=1,
                    callbacks=[callback])
 
     #plot_lr(callback.lr_history, experiment_number)
@@ -96,11 +96,11 @@ def plot_images(images, experiment_number):
         image = cv2.cvtColor( image, cv2.COLOR_BGR2RGB) 
         plt.imshow(np.clip(image, 0, 1))
         plt.axis('off')
-    plt.show()
+    #plt.show()
 
-    #with open( FOLDER + 'generated_faces_{}.png'.format( experiment_number ), 'wb') as file:
-    #    figure.savefig(file, bbox_inches='tight')
-    #plt.close(figure)
+    with open( FOLDER + 'generated_faces_{}.png'.format( experiment_number ), 'wb') as file:
+        figure.savefig(file, bbox_inches='tight')
+    plt.close(figure)
 
 def latent_space(possible_values, dim):
     grid = [ [possible_values[0]] * dim ]
@@ -164,12 +164,12 @@ def run_experiment( experiment_number
     sess = tf.InteractiveSession()
     K.set_session(sess)
 
-    input_shape=(batch_size, 64, 64, 3)    
+    input_shape=(batch_size, 80, 64, 3)    
     weights_file = FOLDER + "face_generator_{}.h5".format( experiment_number )
     
     vae, decoder = build_vae_model(input_shape, latent_dim, conv_filters, conv_kernel, dropout, vae_kl_coef, BN, additional_dense_sf)
-    #vae.summary()
-    #decoder.summary()
+    vae.summary()
+    decoder.summary()
     
     # =========================
 
@@ -205,146 +205,32 @@ def run_experiment( experiment_number
 
 
 if __name__ == '__main__':
-
-    """
-    experiment #1:
-    latent_dim = 8
-    conv_filters = [64, 128, 256, 512]
-    conv_kernel = 5 (single_convs)
-    batch_size = 128
-    epochs = 2000
-    BN
-
-    experiment #2:    
-    latent_dim = 64
-    conv_filters = [128, 256, 512, 1024]
-    conv_kernel = 3 (double_convs)
-    dropout = 0.1
-    batch_size = 32
-    epochs = 500
-    BN
-
-    Good?: 9 128 [64, 128, 256] 3 0.1 32 2 0.01 0.01 True
-
-    ??? 13 32 [64, 128, 256] 3 0.1 32 20 0.001 0.01 True
-
-    !!!: 15 256 [64, 128, 256] 3 None 32 20 0.01 0.01 True
-        Epoch 20/20 - 22s - loss: 0.0590 - val_loss: 0.0568
-
-    26 128 [64, 128, 256] 3 None 32 20 0.001 0.01 True
-        loss: 0.0776 - val_loss: 0.0748
-    -------------
-    ???
-    17 128 [64, 128, 256, 512] 3 None 32 20 0.1 0.1 True
-
-    ------------
-
-    Bad:
-    32 8 [64, 128, 256] 3 0.5 32 20 0.001 0.5 True
-    30 32 [64, 128, 256] 3 0.1 32 20 0.1 2.0 True
-    25 8 [64, 128, 256] 3 None 32 20 0.1 2.0 True
-    ? 16 256 [64, 128, 256] 3 0.1 32 20 0.1 0.5 True
-    14 8 [64, 128, 256, 512] 3 0.1 32 20 0.001 10.0 True
-    ==================================
-
-
-    Good:
-    ?(48, 384, [64, 128, 256], 3, 0.1, 32, 20, 0.01, 0.001, True)
-     (55, 256, [64, 128, 256], 3, None, 32, 20, 0.01, 0.01, True)
-    ?(59, 256, [32, 64, 256, 512], 3, None, 32, 20, 0.01, 0.01, True)
-    ?(62, 384, [32, 64, 128, 256], 3, None, 32, 20, 0.01, 0.001, True)
-    ?(64, 256, [64, 128, 256], 3, 0.1, 32, 20, 0.01, 0.001, True)
-    ?(65, 384, [32, 64, 128, 256], 3, None, 32, 20, 0.01, 0.1, True)
-    ?(66, 512, [64, 128, 256], 3, None, 32, 20, 0.01, 0.001, True) - quickly decreasing
-    ?(69, 384, [64, 128, 256], 3, None, 32, 20, 0.01, 0.1, True)
-    ?(70, 512, [32, 64, 128, 256], 3, None, 32, 20, 0.01, 0.001, True) - quickly decreasing
-    ?(73, 384, [64, 128, 256], 3, 0.1, 32, 20, 0.01, 0.01, True)
-    ?(78, 512, [64, 128, 256], 3, None, 32, 20, 0.01, 0.01, True)
-    ?(79, 512, [32, 64, 256], 3, None, 32, 20, 0.01, 0.1, True)
-    ?(81, 512, [64, 128, 256], 3, None, 32, 20, 0.01, 0.001, True)
-    ?(82, 512, [32, 64, 256], 3, None, 32, 20, 0.01, 0.01, True)
-
-
-    Bad:
-    (45, 256, [32, 64, 128, 256], 3, 0.2, 32, 20, 0.01, 0.01, True)
-    (46, 128, [32, 64, 256], 3, 0.3, 32, 20, 0.01, 0.001, True)
-    (51, 256, [64, 128, 256], 3, 0.2, 32, 20, 0.01, 0.1, True)
-    (56, 256, [32, 64, 128, 256], 3, 0.2, 32, 20, 0.01, 0.1, True)
-    (68, 512, [64, 128, 256], 3, 0.2, 32, 20, 0.01, 0.01, True)
-    (74, 128, [32, 64, 128, 256], 3, 0.3, 32, 20, 0.01, 0.1, True)
-    (86, 128, [32, 64, 256, 512], 3, 0.3, 32, 20, 0.01, 0.1, True)
-    (91, 512, [32, 64, 128, 256], 3, 0.2, 32, 20, 0.01, 0.01, True)
-    (99, 128, [32, 64, 256], 3, 0.2, 32, 20, 0.01, 0.001, True)
-
-    ----------------------------
     
-    Good:
-    (150, 512, [32, 64, 256, 512], 3, None, 32, 80, 0.01, 0.01, True)
-        ~(160, 512, [32, 64, 128, 256], 3, None, 32, 80, 0.01, 0.01, True)
-        ~(163, 256, [32, 64, 128, 256], 3, None, 32, 80, 0.01, 0.01, True)
-    ? (154, 512, [32, 64, 128, 256], 3, None, 32, 80, 0.01, 0.1, True)
-    ? (155, 512, [32, 64, 128, 256], 3, None, 32, 80, 0.01, 0.1, True)
-    (157, 512, [32, 64, 256, 512], 3, 0.1, 32, 80, 0.01, 0.001, True)
-        ! only faces! continur to train?
-        ~(159, 512, [32, 64, 256, 512], 3, 0.1, 32, 80, 0.01, 0.001, True)
-        ~(162, 384, [32, 64, 256, 512], 3, 0.1, 32, 80, 0.01, 0.001, True)
-        ?? ~(165, 384, [32, 64, 256, 512], 3, 0.1, 32, 80, 0.01, 0.001, True)
-    (158, 256, [32, 64, 128, 256], 3, None, 32, 80, 0.01, 0.1, True)
-        ~(164, 512, [32, 64, 256, 512], 3, None, 32, 80, 0.01, 0.1, True)
+    for experiment_number in range(208, 220):
+        latent_dim = np.random.choice( [64, 128, 192] )
+        conv_filters_variants = [ [256, 256, 256, 256], [256, 256, 512, 512], [512, 512, 512, 512] ]
+        conv_filters = conv_filters_variants[ np.random.choice( len(conv_filters_variants) ) ]
+        conv_kernel = 3
+        additional_dense_sf = np.random.choice([ 3, 5 ])
+        dropout = None
+        vae_kl_coef = np.random.choice([ 0.05, 0.1 ])
+        BN = True
+        lr_max = 0.01
+        batch_size = 16
+        epochs = 30
     
-    Bad:
-    (151, 512, [32, 64, 128, 256], 3, None, 32, 80, 0.01, 0.001, True)
-    (152, 512, [32, 64, 128, 256], 3, None, 32, 80, 0.01, 0.001, True)
-    (153, 896, [64, 128, 256], 3, None, 32, 80, 0.01, 0.01, True)
-    (156, 384, [64, 128, 256], 3, None, 32, 80, 0.01, 0.001, True)
-    (161, 512, [32, 64, 128, 256], 3, None, 32, 80, 0.01, 0.001, True)
-    ===============
-
-    (166, 512, [64, 128, 256], 3, 0.1, 32, 80, 0.01, 0.1, True)
-    (175, 256, [32, 64, 128, 256, 512], 3, None, 32, 100, 0.01, 0.009, True)
-
-
-    (183, 128, [32, 64, 256, 512], 3, None, 32, 100, 0.01, 0.001, True)
-    
-
-    """
-
-    #for experiment_number in range(200, 250):
-    #    latent_dim = np.random.choice( [128, 256] )
-    #    conv_filters = np.random.choice( [ [32, 64, 128, 256, 512], [256, 256, 512, 512], [128, 256, 512, 1024], [64, 128, 256, 512, 1024], [32, 64, 128, 256, 512, 1024] ] )
-    #    conv_kernel = 3
-    #    additional_dense_sf = np.random.choice([ 2, 3, 4, 5 ])
-    #    dropout = None # np.random.choice([ None, 0.1, 0.2 ])
-    #    vae_kl_coef = np.random.choice([ 0.1, 0.3, 0.5, 0.7 ])
-    #    BN = True # np.random.choice([ False, True ])
-    #    lr_max = np.random.choice([ 0.003, 0.005, 0.01 ])
-    #    batch_size = 32
-    #    epochs = 100
-    #
-    #    run_experiment( experiment_number
-    #                    ,latent_dim
-    #                    ,conv_filters
-    #                    ,conv_kernel
-    #                    ,dropout
-    #                    ,batch_size
-    #                    ,epochs
-    #                    ,lr_max
-    #                    ,vae_kl_coef
-    #                    ,BN
-    #                    ,additional_dense_sf)
-
-    run_experiment( experiment_number=200
-                    ,latent_dim=128
-                    ,conv_filters=[512, 512, 512, 512]
-                    ,conv_kernel=3
-                    ,dropout=None
-                    ,batch_size=32
-                    ,epochs=300
-                    ,lr_max=0.001
-                    ,vae_kl_coef=0.1
-                    ,BN=True
-                    ,additional_dense_sf=5
-                    ,train=True)
+        run_experiment( experiment_number=experiment_number,
+                        latent_dim=latent_dim,
+                        conv_filters=conv_filters,
+                        conv_kernel=conv_kernel,
+                        dropout=dropout,
+                        batch_size=batch_size,
+                        epochs=epochs,
+                        lr_max=lr_max,
+                        vae_kl_coef=vae_kl_coef,
+                        BN=BN,
+                        additional_dense_sf=additional_dense_sf,
+                        train=True)
 
 
 
